@@ -5,7 +5,16 @@
 **a. Initial design**
 
 - Briefly describe your initial UML design.
+    - I have 4 classes: Owner, Pet, Task, and Scheduler. An Owner can have multiple Pets and a Pet can have multiple Tasks. Scheduler depends on Owner, Pet, and Task objects to generate a plan.
 - What classes did you include, and what responsibilities did you assign to each?
+    - Owner: stores owner info and constraints such as available time and care preferences.
+    - Pet: stores pet profile details (name, species, age/notes) that may affect care needs.
+    - Task: represents a care action (walk, feeding, meds) with duration and priority.
+    - Scheduler: Takes an instance of Owner, Pet, Task and generates a feasible plan.
+- Core Actions: A user should be able to:
+    - Add a Pet.
+    - Edit the attributes of a Pet.
+    - Filter tasks which are feasible at a given instance.
 
 **b. Design changes**
 
