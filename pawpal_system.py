@@ -9,6 +9,7 @@ class Owner:
 	available_minutes_per_day: int = 0
 	preferences: dict[str, Any] = field(default_factory=dict)
 	preferred_task_order: list[str] = field(default_factory=list)
+	pets: list["Pet"] = field(default_factory=list)
 
 	def update_available_time(self, minutes: int) -> None:
 		pass
@@ -22,6 +23,9 @@ class Owner:
 	def get_profile_summary(self) -> str:
 		pass
 
+	def add_pet(self, pet: "Pet") -> None:
+		pass
+
 
 @dataclass
 class Pet:
@@ -31,6 +35,7 @@ class Pet:
 	age_years: int = 0
 	special_needs: list[str] = field(default_factory=list)
 	medical_notes: str = ""
+	tasks: list["Task"] = field(default_factory=list)
 
 	def add_special_need(self, need: str) -> None:
 		pass
@@ -39,6 +44,9 @@ class Pet:
 		pass
 
 	def get_care_profile(self) -> str:
+		pass
+
+	def add_task(self, task: "Task") -> None:
 		pass
 
 
