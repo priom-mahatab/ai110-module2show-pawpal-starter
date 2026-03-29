@@ -88,6 +88,7 @@ class Task:
 	occurrences: int = 1
 	parent_task_id: str = ""
 	scheduled_start_minute: int | None = None
+	scheduled_start_hhmm: str = ""
 
 	def validate(self) -> bool:
 		"""Validate task fields and return whether the task is usable."""
@@ -99,7 +100,17 @@ class Task:
 			return False
 		if self.recurrence not in {"none", "daily", "weekly"}:
 			return False
+		if self.scheduled_start_hhmm and not self._is_valid_hhmm(self.scheduled_start_hhmm):
+			return False
 		return True
+
+	def _is_valid_hhmm(self, value: str) -> bool:
+		parts = value.strip().split(":")
+		if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+			return False
+		hour = int(parts[0])
+		minute = int(parts[1])
+		return 0 <= hour <= 23 and 0 <= minute <= 59
 
 	def priority_score(self) -> int:
 		"""Return a numeric score representing task priority."""
@@ -191,7 +202,7 @@ class Scheduler:
 				continue
 
 			block = task.preferred_time_block if task.preferred_time_block in block_start else ""
-			start_minute = task.scheduled_start_minute
+			start_minute = self._resolve_task_start_minute(task)
 			if start_minute is None:
 				start_minute = block_cursor[block]
 			end_minute = start_minute + task.duration_minutes
@@ -235,11 +246,16 @@ class Scheduler:
 		"""Sort tasks by preferred block then explicit start time when available."""
 		tasks_to_sort = tasks if tasks is not None else self.tasks
 		time_order = {"morning": 0, "afternoon": 1, "evening": 2, "": 3}
+
+		def start_key(task: Task) -> int:
+			start_minute = self._resolve_task_start_minute(task)
+			return start_minute if start_minute is not None else 24 * 60
+
 		return sorted(
 			tasks_to_sort,
 			key=lambda task: (
 				time_order.get(task.preferred_time_block, 3),
-				task.scheduled_start_minute if task.scheduled_start_minute is not None else 24 * 60,
+				start_key(task),
 				task.title.lower(),
 			),
 		)
@@ -262,6 +278,31 @@ class Scheduler:
 			status_norm = status.strip().lower()
 			filtered = [task for task in filtered if task.status.lower() == status_norm]
 		return filtered
+
+	def filter_tasks_by_completion_or_pet_name(
+		self,
+		completion_status: str | None = None,
+		pet_name: str | None = None,
+		tasks: list[Task] | None = None,
+	) -> list[Task]:
+		"""Return tasks matching completion status and/or pet name.
+
+		When both filters are provided, a task is included if either filter matches.
+		"""
+		items = list(tasks if tasks is not None else self.tasks)
+		status_norm = completion_status.strip().lower() if completion_status else None
+		pet_name_norm = pet_name.strip().lower() if pet_name else None
+
+		if not status_norm and not pet_name_norm:
+			return items
+
+		results: list[Task] = []
+		for task in items:
+			status_match = bool(status_norm and task.status.lower() == status_norm)
+			pet_match = bool(pet_name_norm and task.pet_name.lower() == pet_name_norm)
+			if status_match or pet_match:
+				results.append(task)
+		return results
 
 	def expand_recurring_tasks(self, tasks: list[Task] | None = None, days: int = 1) -> list[Task]:
 		"""Expand recurring tasks into occurrences visible within the given day window."""
@@ -328,3 +369,21 @@ class Scheduler:
 		hour = minute_of_day // 60
 		minute = minute_of_day % 60
 		return f"{hour:02d}:{minute:02d}"
+
+	def _resolve_task_start_minute(self, task: Task) -> int | None:
+		parsed = self._parse_hhmm_to_minute(task.scheduled_start_hhmm)
+		if parsed is not None:
+			return parsed
+		return task.scheduled_start_minute
+
+	def _parse_hhmm_to_minute(self, value: str) -> int | None:
+		if not value:
+			return None
+		parts = value.strip().split(":")
+		if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+			return None
+		hour = int(parts[0])
+		minute = int(parts[1])
+		if not (0 <= hour <= 23 and 0 <= minute <= 59):
+			return None
+		return (hour * 60) + minute

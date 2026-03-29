@@ -42,6 +42,36 @@ def test_sort_tasks_by_time_orders_blocks_then_start_time():
     assert [task.task_id for task in ordered] == ["t1", "t2", "t3"]
 
 
+def test_sort_tasks_by_time_accepts_hhmm_start_strings():
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    tasks = [
+        Task(
+            task_id="t2",
+            title="Morning walk",
+            category="walk",
+            duration_minutes=20,
+            priority="high",
+            preferred_time_block="morning",
+            scheduled_start_hhmm="09:00",
+        ),
+        Task(
+            task_id="t1",
+            title="Breakfast",
+            category="feeding",
+            duration_minutes=10,
+            priority="medium",
+            preferred_time_block="morning",
+            scheduled_start_hhmm="08:00",
+        ),
+    ]
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=tasks)
+
+    ordered = scheduler.sort_tasks_by_time()
+
+    assert [task.task_id for task in ordered] == ["t1", "t2"]
+
+
 def test_filter_tasks_by_pet_and_status_returns_expected_tasks():
     owner = Owner(name="Jordan", available_minutes_per_day=120)
     pet = Pet(pet_id="p1", name="Mochi", species="dog")
@@ -95,3 +125,43 @@ def test_detect_conflicts_finds_overlapping_time_windows():
     conflicts = scheduler.detect_conflicts(plan)
 
     assert conflicts == [("t1", "t2")]
+
+
+def test_build_time_order_uses_hhmm_start_time_for_plan_window():
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    tasks = [
+        Task(
+            task_id="t1",
+            title="Medication",
+            category="meds",
+            duration_minutes=15,
+            priority="high",
+            preferred_time_block="morning",
+            scheduled_start_hhmm="08:30",
+        )
+    ]
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=tasks)
+
+    plan = scheduler.build_time_order(tasks)
+
+    assert plan[0]["start_minute"] == (8 * 60) + 30
+    assert plan[0]["end_minute"] == (8 * 60) + 45
+
+
+def test_filter_tasks_by_completion_or_pet_name_uses_or_matching():
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    tasks = [
+        Task(task_id="t1", title="Walk", category="walk", duration_minutes=20, priority="high", pet_name="Mochi", status="pending"),
+        Task(task_id="t2", title="Feed", category="feeding", duration_minutes=10, priority="medium", pet_name="Mochi", status="completed"),
+        Task(task_id="t3", title="Play", category="enrichment", duration_minutes=15, priority="low", pet_name="Luna", status="pending"),
+    ]
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=tasks)
+
+    filtered = scheduler.filter_tasks_by_completion_or_pet_name(
+        completion_status="completed",
+        pet_name="Luna",
+    )
+
+    assert [task.task_id for task in filtered] == ["t2", "t3"]
