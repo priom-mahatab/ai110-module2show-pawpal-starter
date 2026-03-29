@@ -35,6 +35,41 @@ class Owner:
 		if all(existing.pet_id != pet.pet_id for existing in self.pets):
 			self.pets.append(pet)
 
+	def get_pet(self, pet_id: str) -> "Pet | None":
+		"""Return the pet with the given ID, or None if no match exists."""
+		return next((pet for pet in self.pets if pet.pet_id == pet_id), None)
+
+	def remove_pet(self, pet_id: str) -> bool:
+		"""Remove a pet by ID and return whether a pet was removed."""
+		pet = self.get_pet(pet_id)
+		if pet is None:
+			return False
+		self.pets.remove(pet)
+		return True
+
+	def update_pet(
+		self,
+		pet_id: str,
+		name: str | None = None,
+		species: str | None = None,
+		age_years: int | None = None,
+		special_needs: list[str] | None = None,
+		medical_notes: str | None = None,
+	) -> bool:
+		"""Update editable fields for a pet and return whether the pet was found."""
+		pet = self.get_pet(pet_id)
+		if pet is None:
+			return False
+
+		pet.update_profile(
+			name=name,
+			species=species,
+			age_years=age_years,
+			special_needs=special_needs,
+			medical_notes=medical_notes,
+		)
+		return True
+
 
 @dataclass
 class Pet:
@@ -69,6 +104,109 @@ class Pet:
 		if not task.pet_name:
 			task.pet_name = self.name
 		self.tasks.append(task)
+
+	def update_profile(
+		self,
+		name: str | None = None,
+		species: str | None = None,
+		age_years: int | None = None,
+		special_needs: list[str] | None = None,
+		medical_notes: str | None = None,
+	) -> None:
+		"""Update editable pet profile fields."""
+		if name is not None:
+			self.name = name.strip()
+		if species is not None:
+			self.species = species.strip()
+		if age_years is not None:
+			self.age_years = max(0, int(age_years))
+		if special_needs is not None:
+			self.special_needs = [need.strip() for need in special_needs if need.strip()]
+		if medical_notes is not None:
+			self.medical_notes = medical_notes.strip()
+
+		# Keep task labels aligned when pet name changes.
+		for task in self.tasks:
+			task.pet_name = self.name
+
+	def get_task(self, task_id: str) -> "Task | None":
+		"""Return a task by ID, or None if not found."""
+		return next((task for task in self.tasks if task.task_id == task_id), None)
+
+	def remove_task(self, task_id: str) -> bool:
+		"""Remove task by ID and return whether a task was removed."""
+		task = self.get_task(task_id)
+		if task is None:
+			return False
+		self.tasks.remove(task)
+		return True
+
+	def update_task(
+		self,
+		task_id: str,
+		title: str | None = None,
+		category: str | None = None,
+		duration_minutes: int | None = None,
+		priority: str | None = None,
+		status: str | None = None,
+		required: bool | None = None,
+		preferred_time_block: str | None = None,
+		notes: str | None = None,
+		recurrence: str | None = None,
+		occurrences: int | None = None,
+		scheduled_start_minute: int | None = None,
+		scheduled_start_hhmm: str | None = None,
+	) -> bool:
+		"""Update a task by ID and return whether update succeeded validation."""
+		task = self.get_task(task_id)
+		if task is None:
+			return False
+
+		original = replace(task)
+
+		if title is not None:
+			task.title = title
+		if category is not None:
+			task.category = category
+		if duration_minutes is not None:
+			task.duration_minutes = int(duration_minutes)
+		if priority is not None:
+			task.priority = priority
+		if status is not None:
+			task.status = status
+		if required is not None:
+			task.required = bool(required)
+		if preferred_time_block is not None:
+			task.preferred_time_block = preferred_time_block
+		if notes is not None:
+			task.notes = notes
+		if recurrence is not None:
+			task.recurrence = recurrence
+		if occurrences is not None:
+			task.occurrences = max(1, int(occurrences))
+		if scheduled_start_minute is not None:
+			task.scheduled_start_minute = int(scheduled_start_minute)
+		if scheduled_start_hhmm is not None:
+			task.scheduled_start_hhmm = scheduled_start_hhmm
+
+		if not task.validate():
+			task.title = original.title
+			task.category = original.category
+			task.duration_minutes = original.duration_minutes
+			task.priority = original.priority
+			task.status = original.status
+			task.required = original.required
+			task.preferred_time_block = original.preferred_time_block
+			task.notes = original.notes
+			task.recurrence = original.recurrence
+			task.occurrences = original.occurrences
+			task.scheduled_start_minute = original.scheduled_start_minute
+			task.scheduled_start_hhmm = original.scheduled_start_hhmm
+			return False
+
+		task.pet_id = self.pet_id
+		task.pet_name = self.name
+		return True
 
 
 @dataclass

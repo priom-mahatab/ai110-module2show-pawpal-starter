@@ -369,3 +369,61 @@ def test_detect_conflicts_multiple_overlaps():
     conflict_pairs = {tuple(sorted([c[0], c[1]])) for c in conflicts}
     assert ("t1", "t2") in conflict_pairs
     assert ("t1", "t3") in conflict_pairs or ("t2", "t3") in conflict_pairs
+
+
+def test_owner_update_pet_updates_profile_fields():
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog", age_years=2)
+    owner.add_pet(pet)
+
+    updated = owner.update_pet(
+        "p1",
+        name="Mochi Jr",
+        species="dog",
+        age_years=3,
+        special_needs=["daily meds"],
+        medical_notes="sensitive stomach",
+    )
+
+    assert updated is True
+    assert pet.name == "Mochi Jr"
+    assert pet.age_years == 3
+    assert pet.special_needs == ["daily meds"]
+    assert pet.medical_notes == "sensitive stomach"
+
+
+def test_pet_update_task_and_remove_task():
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    task = Task(task_id="t1", title="Walk", category="walk", duration_minutes=20, priority="high")
+    pet.add_task(task)
+
+    updated = pet.update_task(
+        "t1",
+        title="Morning walk",
+        duration_minutes=25,
+        status="pending",
+        preferred_time_block="morning",
+        scheduled_start_hhmm="08:30",
+    )
+
+    assert updated is True
+    assert task.title == "Morning walk"
+    assert task.duration_minutes == 25
+    assert task.preferred_time_block == "morning"
+    assert task.scheduled_start_hhmm == "08:30"
+
+    removed = pet.remove_task("t1")
+    assert removed is True
+    assert pet.get_task("t1") is None
+
+
+def test_pet_update_task_reverts_on_invalid_values():
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    task = Task(task_id="t1", title="Feed", category="feeding", duration_minutes=10, priority="medium")
+    pet.add_task(task)
+
+    updated = pet.update_task("t1", duration_minutes=0, priority="urgent")
+
+    assert updated is False
+    assert task.duration_minutes == 10
+    assert task.priority == "medium"

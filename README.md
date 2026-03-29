@@ -22,17 +22,34 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
-## Smarter Scheduling
+## Features
 
-Your PawPal+ scheduler includes these key algorithmic features:
+The current implementation includes these scheduling and planning features:
 
-- **Time-based sorting**: Tasks are reordered by preferred time block (morning, afternoon, evening) and exact start time (HH:MM format), ensuring a logical daily flow.
-- **Flexible filtering**: Filter tasks by pet name, completion status, or both using explicit AND/OR logic to quickly find relevant tasks.
-- **Recurring task auto-expansion**: Daily and weekly recurring tasks are intelligently expanded for a given time window and marked with parent task links.
-- **Recurrence completion workflow**: When a recurring task is marked complete, the next instance is automatically created and appended, maintaining the recurrence chain.
-- **Conflict detection**: The scheduler detects overlapping time windows and logs conflicts or skips conflicting tasks from the final plan.
-- **Owner time budgeting**: Tasks are filtered to never exceed the owner's available care minutes per day.
-- **HH:MM start time support**: Tasks can specify start times in human-readable HH:MM format (e.g., "08:30") for precise scheduling.
+- **Sorting by time**: Tasks are sorted by preferred time block (`morning`, `afternoon`, `evening`) and then by explicit start time when provided.
+- **Priority-aware ranking**: Within planning, higher-priority tasks are favored before lower-priority tasks in the same scheduling context.
+- **Constraint filtering**: Invalid tasks and already completed tasks are excluded before schedule construction.
+- **Owner time budgeting**: The schedule enforces the owner's daily minute limit and pushes overflow tasks to an unscheduled list.
+- **Conflict prevention + warnings**: Overlapping tasks are skipped during plan building, and conflict notes are surfaced in scheduler reasoning logs and UI warnings.
+- **Task filtering tools**: Tasks can be filtered by pet and status with AND matching, plus an OR-based helper for completion status or pet name.
+- **Daily/weekly recurrence expansion**: Recurring tasks can expand into visible occurrences for a chosen time window.
+- **Recurrence continuation on completion**: Completing a recurring task automatically creates the next instance in the chain.
+- **HH:MM parsing support**: Start times can be entered in HH:MM format and converted to minute-based scheduling.
+- **Pet and task mutation methods**: Existing pets and tasks can be updated or removed through dedicated model methods (now wired into the Streamlit UI).
+
+## Demo
+
+![PawPal Demo 1](<images/Screenshot 2026-03-29 at 5.30.50 PM.png>)
+
+![PawPal Demo 2](<images/Screenshot 2026-03-29 at 5.30.59 PM.png>)
+
+![PawPal Demo 3](<images/Screenshot 2026-03-29 at 5.31.10 PM.png>)
+
+![PawPal Demo 4](<images/Screenshot 2026-03-29 at 5.31.16 PM.png>)
+
+![PawPal Demo 5](<images/Screenshot 2026-03-29 at 5.31.24 PM.png>)
+
+![PawPal Demo 6](<images/Screenshot 2026-03-29 at 5.31.33 PM.png>)
 
 ## Getting started
 
@@ -64,7 +81,7 @@ python -m pytest
 
 ### Test coverage
 
-The test suite (20 tests) verifies:
+The test suite (23 tests) verifies:
 
 - **Task completion & recurrence**: Marking tasks complete generates next occurrences with correct IDs and parent links
 - **Chronological ordering**: Tasks sort correctly by preferred time block and scheduled start time (both HH:MM and minute formats)
@@ -75,4 +92,4 @@ The test suite (20 tests) verifies:
 
 ### Reliability confidence: ⭐⭐⭐⭐ (4/5)
 
-**Why 4 stars?** All 20 core tests pass, covering the most critical scheduling behaviors (recurring tasks, time ordering, conflict detection, and filtering). The system reliably handles daily workflows and multi-pet scenarios. However, edge cases like unusual recurrence patterns, extreme time windows, or concurrent overlapping recurrences could use additional coverage for production use.
+**Why 4 stars?** All 23 core tests pass, covering the most critical scheduling behaviors (recurring tasks, time ordering, conflict detection, filtering, and update/remove mutation flows). The system reliably handles daily workflows and multi-pet scenarios. However, edge cases like unusual recurrence patterns, extreme time windows, or concurrent overlapping recurrences could use additional coverage for production use.
