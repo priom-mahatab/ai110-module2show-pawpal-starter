@@ -207,3 +207,165 @@ def test_filter_tasks_by_completion_or_pet_name_uses_or_matching():
     )
 
     assert [task.task_id for task in filtered] == ["t2", "t3"]
+
+def test_tasks_returned_in_chronological_order_by_preferred_time_block():
+    """Verify tasks are ordered by time block priority: morning < afternoon < evening"""
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    tasks = [
+        Task(task_id="t3", title="Evening meds", category="meds", duration_minutes=10, priority="high", preferred_time_block="evening"),
+        Task(task_id="t1", title="Morning walk", category="walk", duration_minutes=20, priority="high", preferred_time_block="morning"),
+        Task(task_id="t2", title="Afternoon play", category="enrichment", duration_minutes=15, priority="medium", preferred_time_block="afternoon"),
+    ]
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=tasks)
+
+    ordered = scheduler.sort_tasks_by_time()
+
+    assert [task.task_id for task in ordered] == ["t1", "t2", "t3"]
+
+
+def test_tasks_chronological_order_within_same_time_block():
+    """Verify tasks within same time block are ordered by scheduled_start_minute"""
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    tasks = [
+        Task(task_id="t2", title="Mid-morning walk", category="walk", duration_minutes=20, priority="high", preferred_time_block="morning", scheduled_start_minute=9 * 60),
+        Task(task_id="t1", title="Early morning feed", category="feeding", duration_minutes=10, priority="medium", preferred_time_block="morning", scheduled_start_minute=8 * 60),
+        Task(task_id="t3", title="Late morning groom", category="grooming", duration_minutes=30, priority="low", preferred_time_block="morning", scheduled_start_minute=10 * 60),
+    ]
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=tasks)
+
+    ordered = scheduler.sort_tasks_by_time()
+
+    assert [task.task_id for task in ordered] == ["t1", "t2", "t3"]
+
+
+def test_tasks_chronological_order_mixed_hhmm_and_minute_formats():
+    """Verify chronological ordering works with mixed scheduled_start_hhmm and scheduled_start_minute"""
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    tasks = [
+        Task(task_id="t3", title="Noon play", category="enrichment", duration_minutes=15, priority="medium", preferred_time_block="afternoon", scheduled_start_minute=12 * 60),
+        Task(task_id="t1", title="Morning med", category="meds", duration_minutes=5, priority="high", preferred_time_block="morning", scheduled_start_hhmm="08:00"),
+        Task(task_id="t2", title="Late morning walk", category="walk", duration_minutes=20, priority="high", preferred_time_block="morning", scheduled_start_hhmm="10:30"),
+    ]
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=tasks)
+
+    ordered = scheduler.sort_tasks_by_time()
+
+    assert [task.task_id for task in ordered] == ["t1", "t2", "t3"]
+
+
+def test_daily_task_mark_complete_creates_next_day_occurrence_with_pending_status():
+    """Confirm marking a daily task complete generates next occurrence with pending status"""
+    task = Task(
+        task_id="daily_1",
+        title="Daily vitamins",
+        category="meds",
+        duration_minutes=5,
+        priority="high",
+        recurrence="daily",
+        status="pending"
+    )
+
+    next_task = task.mark_complete()
+
+    assert task.status in {"complete", "completed", "done"}
+    assert next_task is not None
+    assert next_task.task_id == "daily_1-next-1"
+    assert next_task.status == "pending"
+    assert next_task.recurrence == "daily"
+
+
+def test_daily_task_chain_creates_sequential_next_occurrences():
+    """Verify completing daily task chain creates subsequent occurrences with correct IDs"""
+    task = Task(
+        task_id="daily_med",
+        title="Daily medication",
+        category="meds",
+        duration_minutes=10,
+        priority="high",
+        recurrence="daily",
+        status="pending"
+    )
+
+    first_next = task.mark_complete()
+    assert first_next.task_id == "daily_med-next-1"
+
+    second_next = first_next.mark_complete()
+    assert second_next is not None
+    assert second_next.task_id == "daily_med-next-2"
+    assert second_next.parent_task_id == "daily_med"
+
+
+def test_scheduler_complete_daily_task_updates_task_list():
+    """Verify scheduler.complete_task() adds daily task next occurrence to task list"""
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    daily_task = Task(
+        task_id="d1",
+        title="Morning feed",
+        category="feeding",
+        duration_minutes=15,
+        priority="high",
+        recurrence="daily",
+        status="pending"
+    )
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=[daily_task])
+    initial_task_count = len(scheduler.tasks)
+
+    next_task = scheduler.complete_task("d1")
+
+    assert len(scheduler.tasks) == initial_task_count + 1
+    assert any(t.task_id == "d1-next-1" for t in scheduler.tasks)
+    assert next_task.status == "pending"
+
+
+def test_detect_conflicts_flags_overlapping_time_windows():
+    """Verify scheduler flags duplicate/overlapping times in plan"""
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=[])
+    plan = [
+        {"task_id": "t1", "start_minute": 8 * 60, "end_minute": 8 * 60 + 30},
+        {"task_id": "t2", "start_minute": 8 * 60 + 15, "end_minute": 8 * 60 + 45},  # Overlaps with t1
+    ]
+
+    conflicts = scheduler.detect_conflicts(plan)
+
+    assert len(conflicts) > 0
+    assert ("t1", "t2") in conflicts or ("t2", "t1") in conflicts
+
+
+def test_detect_conflicts_no_duplicates_for_adjacent_tasks():
+    """Verify adjacent (non-overlapping) tasks are NOT flagged as conflicts"""
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=[])
+    plan = [
+        {"task_id": "t1", "start_minute": 8 * 60, "end_minute": 8 * 60 + 30},
+        {"task_id": "t2", "start_minute": 8 * 60 + 30, "end_minute": 9 * 60},  # Starts exactly when t1 ends
+    ]
+
+    conflicts = scheduler.detect_conflicts(plan)
+
+    assert len(conflicts) == 0
+
+
+def test_detect_conflicts_multiple_overlaps():
+    """Verify scheduler detects all pairwise conflicts in complex overlapping scenarios"""
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=[])
+    plan = [
+        {"task_id": "t1", "start_minute": 8 * 60, "end_minute": 9 * 60},
+        {"task_id": "t2", "start_minute": 8 * 60 + 30, "end_minute": 9 * 60 + 30},  # Overlaps t1
+        {"task_id": "t3", "start_minute": 8 * 60 + 45, "end_minute": 10 * 60},      # Overlaps t1, t2
+    ]
+
+    conflicts = scheduler.detect_conflicts(plan)
+
+    assert len(conflicts) >= 2
+    conflict_pairs = {tuple(sorted([c[0], c[1]])) for c in conflicts}
+    assert ("t1", "t2") in conflict_pairs
+    assert ("t1", "t3") in conflict_pairs or ("t2", "t3") in conflict_pairs
