@@ -11,10 +11,52 @@ def test_mark_complete_updates_task_status():
     task = Task(title="Evening Walk", category="walk", duration_minutes=20, priority="high")
     initial_status = getattr(task, "status", None)
 
-    task.mark_complete()
+    next_instance = task.mark_complete()
 
     assert getattr(task, "status", None) != initial_status
     assert str(getattr(task, "status", "")).lower() in {"complete", "completed", "done"}
+    assert next_instance is None
+
+
+def test_mark_complete_creates_next_instance_for_daily_task():
+    task = Task(
+        task_id="t1",
+        title="Daily meds",
+        category="meds",
+        duration_minutes=10,
+        priority="high",
+        recurrence="daily",
+    )
+
+    next_instance = task.mark_complete()
+
+    assert next_instance is not None
+    assert next_instance.task_id == "t1-next-1"
+    assert next_instance.parent_task_id == "t1"
+    assert next_instance.status == "pending"
+
+
+def test_scheduler_complete_task_appends_next_weekly_occurrence():
+    owner = Owner(name="Jordan", available_minutes_per_day=120)
+    pet = Pet(pet_id="p1", name="Mochi", species="dog")
+    recurring = Task(
+        task_id="w1",
+        title="Weekly grooming",
+        category="grooming",
+        duration_minutes=30,
+        priority="medium",
+        recurrence="weekly",
+        status="pending",
+    )
+    scheduler = Scheduler(owner=owner, pet=pet, tasks=[recurring])
+
+    next_instance = scheduler.complete_task("w1")
+
+    assert next_instance is not None
+    assert recurring.status == "completed"
+    assert next_instance.task_id == "w1-next-1"
+    assert next_instance.recurrence == "weekly"
+    assert any(task.task_id == "w1-next-1" for task in scheduler.tasks)
 
 
 def test_add_task_increases_pet_task_count():

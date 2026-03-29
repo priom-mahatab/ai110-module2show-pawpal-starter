@@ -30,12 +30,16 @@
 **a. Constraints and priorities**
 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
+    - My scheduler considers owner time limits, task priority, preferred time blocks (morning/afternoon/evening), HH:MM start times when provided, task completion status, recurrence rules (daily/weekly), and basic conflict detection for overlaps.
 - How did you decide which constraints mattered most?
+    - I prioritized feasibility first, then quality. Feasibility means the plan must fit the owner's available minutes and avoid invalid or completed tasks. After that, I optimize for usefulness by ordering tasks by time block and start time, then priority so critical tasks are still emphasized.
 
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
+    - A key tradeoff is using a deterministic sort-and-filter strategy instead of a complex global optimization algorithm. This approach is simpler and predictable, but it may not always find the absolute best possible schedule in every edge case.
 - Why is that tradeoff reasonable for this scenario?
+    - It is reasonable because pet owners need clear and fast plans that are easy to trust and debug. For this project scope, readable logic and consistent behavior are more valuable than heavy optimization complexity.
 
 ---
 

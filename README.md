@@ -22,6 +22,18 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Smarter Scheduling
+
+Your PawPal+ scheduler includes these key algorithmic features:
+
+- **Time-based sorting**: Tasks are reordered by preferred time block (morning, afternoon, evening) and exact start time (HH:MM format), ensuring a logical daily flow.
+- **Flexible filtering**: Filter tasks by pet name, completion status, or both using explicit AND/OR logic to quickly find relevant tasks.
+- **Recurring task auto-expansion**: Daily and weekly recurring tasks are intelligently expanded for a given time window and marked with parent task links.
+- **Recurrence completion workflow**: When a recurring task is marked complete, the next instance is automatically created and appended, maintaining the recurrence chain.
+- **Conflict detection**: The scheduler detects overlapping time windows and logs conflicts or skips conflicting tasks from the final plan.
+- **Owner time budgeting**: Tasks are filtered to never exceed the owner's available care minutes per day.
+- **HH:MM start time support**: Tasks can specify start times in human-readable HH:MM format (e.g., "08:30") for precise scheduling.
+
 ## Getting started
 
 ### Setup

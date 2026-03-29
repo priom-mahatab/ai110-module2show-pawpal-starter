@@ -133,9 +133,48 @@ class Task:
 		"""Return whether this task is marked as high priority."""
 		return self.priority.lower() == "high"
 
-	def mark_complete(self) -> None:
-		"""Mark the task as completed."""
+	def mark_complete(self) -> "Task | None":
+		"""Mark the task as completed and create next recurring instance if needed."""
 		self.status = "completed"
+		return self.create_next_occurrence()
+
+	def create_next_occurrence(self) -> "Task | None":
+		"""Create and return the next recurring task instance when recurrence is enabled."""
+		recurrence_mode = self.recurrence.lower()
+		if recurrence_mode not in {"daily", "weekly"}:
+			return None
+
+		base_id = self.parent_task_id or self._get_base_recurrence_id()
+		next_index = self._get_recurrence_index() + 1
+
+		next_task = replace(self)
+		next_task.parent_task_id = base_id
+		next_task.task_id = f"{base_id}-next-{next_index}"
+		next_task.status = "pending"
+		next_task.notes = self._append_recurrence_note(next_task.notes, recurrence_mode)
+		return next_task
+
+	def _get_base_recurrence_id(self) -> str:
+		"""Extract the base task ID from a recurrence chain ID (e.g., 'task-1-next-5' -> 'task-1')."""
+		if "-next-" in self.task_id:
+			return self.task_id.split("-next-")[0]
+		return self.task_id
+
+	def _get_recurrence_index(self) -> int:
+		"""Return the occurrence index from task ID (e.g., 'task-1-next-5' -> 5), or 0 if not a recurrence."""
+		if "-next-" not in self.task_id:
+			return 0
+		suffix = self.task_id.rsplit("-next-", maxsplit=1)[-1]
+		if suffix.isdigit():
+			return int(suffix)
+		return 0
+
+	def _append_recurrence_note(self, existing_notes: str, recurrence_mode: str) -> str:
+		"""Append a recurrence annotation to existing notes, or create new notes if empty."""
+		note = f"auto-created next {recurrence_mode} occurrence"
+		if existing_notes:
+			return f"{existing_notes} | {note}"
+		return note
 
 
 class Scheduler:
@@ -241,6 +280,20 @@ class Scheduler:
 	def get_unscheduled_tasks(self) -> list[Task]:
 		"""Return tasks that were not included in the final schedule."""
 		return self.unscheduled_tasks
+
+	def complete_task(self, task_id: str) -> Task | None:
+		"""Mark a task complete and append the next recurring instance when relevant."""
+		task = next((item for item in self.tasks if item.task_id == task_id), None)
+		if task is None:
+			return None
+
+		next_task = task.mark_complete()
+		if next_task and all(item.task_id != next_task.task_id for item in self.tasks):
+			self.tasks.append(next_task)
+			self.reasoning_log.append(
+				f"Created next recurring task instance '{next_task.task_id}' after completing '{task_id}'."
+			)
+		return next_task
 
 	def sort_tasks_by_time(self, tasks: list[Task] | None = None) -> list[Task]:
 		"""Sort tasks by preferred block then explicit start time when available."""
@@ -360,6 +413,7 @@ class Scheduler:
 		end_minute: int,
 		existing_plan: list[dict[str, Any]],
 	) -> bool:
+		"""Check if a proposed time window overlaps with any scheduled task in the plan."""
 		for row in existing_plan:
 			if start_minute < row["end_minute"] and end_minute > row["start_minute"]:
 				return True
@@ -371,12 +425,14 @@ class Scheduler:
 		return f"{hour:02d}:{minute:02d}"
 
 	def _resolve_task_start_minute(self, task: Task) -> int | None:
+		"""Resolve the effective start time: prefer HH:MM format, fall back to numeric minutes."""
 		parsed = self._parse_hhmm_to_minute(task.scheduled_start_hhmm)
 		if parsed is not None:
 			return parsed
 		return task.scheduled_start_minute
 
 	def _parse_hhmm_to_minute(self, value: str) -> int | None:
+		"""Convert HH:MM string (e.g., '08:30') to minutes since midnight (e.g., 510); return None if invalid."""
 		if not value:
 			return None
 		parts = value.strip().split(":")
